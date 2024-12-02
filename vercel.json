@@ -1,13 +1,22 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build-storybook",
   "outputDirectory": "storybook-static",
-  "devCommand": "npm run dev",
+  "devCommand": "npm run storybook",
   "installCommand": "npm install",
   "framework": null,
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build"
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "storybook-static"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
