@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { ArrowUpIcon, ArrowDownIcon } from "@radix-ui/react-icons"
 
+type TrendDirection = "up" | "down"
+
 interface CategorySummaryProps {
   categories: {
     name: string
@@ -11,7 +13,7 @@ interface CategorySummaryProps {
     revenue: number
     trend: {
       value: number
-      direction: "up" | "down"
+      direction: TrendDirection
     }
   }[]
   size?: "sm" | "md" | "lg"
@@ -23,7 +25,6 @@ const sizeConfig = {
     valueSize: "text-2xl",
     nameSize: "text-[10px]",
     revenueSize: "text-[10px]",
-    gap: "gap-2",
     padding: "p-3",
     badgeSize: "h-2.5 w-2.5",
   },
@@ -32,7 +33,6 @@ const sizeConfig = {
     valueSize: "text-3xl",
     nameSize: "text-xs",
     revenueSize: "text-xs",
-    gap: "gap-3",
     padding: "p-4",
     badgeSize: "h-3 w-3",
   },
@@ -41,7 +41,6 @@ const sizeConfig = {
     valueSize: "text-4xl",
     nameSize: "text-sm",
     revenueSize: "text-sm",
-    gap: "gap-4",
     padding: "p-5",
     badgeSize: "h-3.5 w-3.5",
   },
@@ -60,7 +59,7 @@ const formatNumber = (value: number) => {
 }
 
 const TrendBadge = ({ trend, size, compact = false }: { 
-  trend: { value: number; direction: "up" | "down" }
+  trend: { value: number; direction: TrendDirection }
   size: "sm" | "md" | "lg"
   compact?: boolean
 }) => {
@@ -89,29 +88,29 @@ const CategorySummary = ({
 
   return (
     <Card style={{ width: config.width }}>
-      <CardContent className={cn(config.padding, "flex justify-between")}>
-        {categories.map((category, index) => (
-          <React.Fragment key={category.name}>
-            <div className="flex flex-col items-center text-center">
-              <div className={cn(config.valueSize, "font-bold tabular-nums")}>
-                {formatNumber(category.users)}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className={cn(config.nameSize, "font-medium text-foreground")}>
+      <CardContent className={config.padding}>
+        <div className="flex items-center justify-between">
+          {categories.map((category, index) => (
+            <React.Fragment key={category.name}>
+              <div className="flex flex-col items-center min-w-0">
+                <TrendBadge trend={category.trend} size={size} />
+                <div className={cn(config.valueSize, "font-bold tabular-nums mt-1")}>
+                  {formatNumber(category.users)}
+                </div>
+                <div className={cn(config.nameSize, "font-medium text-foreground truncate max-w-[100px] mt-1")}>
                   {category.name}
                 </div>
-                <TrendBadge trend={category.trend} size={size} />
+                <div className={cn(config.revenueSize, "text-muted-foreground flex items-center gap-0.5 mt-1")}>
+                  <span>${formatNumber(category.revenue)}</span>
+                  <TrendBadge trend={category.trend} size={size} compact />
+                </div>
               </div>
-              <div className={cn(config.revenueSize, "text-muted-foreground mt-0.5 flex items-center gap-1")}>
-                <span>${formatNumber(category.revenue)}</span>
-                <TrendBadge trend={category.trend} size={size} compact />
-              </div>
-            </div>
-            {index < categories.length - 1 && (
-              <div className="self-stretch w-px bg-border" />
-            )}
-          </React.Fragment>
-        ))}
+              {index < categories.length - 1 && (
+                <div className="self-stretch w-px bg-border" />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )
@@ -128,43 +127,60 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof CategorySummary>
 
-const funnelData = [
+const funnelData: {
+  name: string
+  users: number
+  revenue: number
+  trend: {
+    value: number
+    direction: TrendDirection
+  }
+}[] = [
   {
-    name: "Impressions",
-    users: 1250000,
-    revenue: 12500,
+    name: "Awareness",
+    users: 10000,
+    revenue: 50000,
     trend: {
       value: 12.5,
-      direction: "up"
+      direction: "up" as const
     }
   },
   {
-    name: "Clicks",
-    users: 280000,
-    revenue: 28000,
+    name: "Interest",
+    users: 7500,
+    revenue: 37500,
     trend: {
       value: 8.3,
-      direction: "up"
+      direction: "up" as const
     }
   },
   {
-    name: "Sign-ups",
-    users: 85000,
-    revenue: 85000,
+    name: "Consideration",
+    users: 5000,
+    revenue: 25000,
     trend: {
-      value: 3.2,
-      direction: "down"
+      value: -4.2,
+      direction: "down" as const
     }
   },
   {
-    name: "Purchases",
-    users: 25000,
-    revenue: 250000,
+    name: "Intent",
+    users: 2500,
+    revenue: 12500,
     trend: {
-      value: 15.8,
-      direction: "up"
+      value: 15.7,
+      direction: "up" as const
     }
   },
+  {
+    name: "Evaluation",
+    users: 1000,
+    revenue: 5000,
+    trend: {
+      value: -2.8,
+      direction: "down" as const
+    }
+  }
 ]
 
 export const SmallUsage: Story = {

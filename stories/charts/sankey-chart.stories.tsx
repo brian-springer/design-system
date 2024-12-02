@@ -10,12 +10,63 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  ChartConfig,
   ChartContainer,
 } from "@/components/ui/chart"
 
+type SankeyNode = {
+  id: string
+  label: string
+  color: string
+}
+
+type SankeyLink = {
+  source: string
+  target: string
+  value: number
+}
+
+type SankeyChartColors = {
+  source1: string
+  source2: string
+  source3: string
+  source4: string
+  source5: string
+  target1: string
+  target2: string
+  target3: string
+  target4: string
+  target5: string
+  flow: string
+}
+
+type SankeyChartConfig = {
+  traffic: {
+    label: string
+    colors: SankeyChartColors
+  }
+  rainbow: {
+    label: string
+    colors: {
+      red: string
+      orange: string
+      amber: string
+      yellow: string
+      lime: string
+      green: string
+      emerald: string
+      teal: string
+      cyan: string
+      blue: string
+      indigo: string
+      violet: string
+      purple: string
+      pink: string
+    }
+  }
+}
+
 // Chart configuration with color palettes
-const chartConfig = {
+const chartConfig: SankeyChartConfig = {
   traffic: {
     label: "Traffic Flow",
     colors: {
@@ -24,13 +75,13 @@ const chartConfig = {
       source3: "#0369a1", // sky-700
       source4: "#0284c7", // sky-600
       source5: "#0ea5e9", // sky-500
-      target1: "#38bdf8", // sky-400
-      target2: "#7dd3fc", // sky-300
-      target3: "#bae6fd", // sky-200
-      target4: "#e0f2fe", // sky-100
-      target5: "#f0f9ff", // sky-50
-      flow: "#0ea5e9", // sky-500
-    },
+      target1: "#7dd3fc", // sky-300
+      target2: "#bae6fd", // sky-200
+      target3: "#e0f2fe", // sky-100
+      target4: "#f0f9ff", // sky-50
+      target5: "#f8fafc", // sky-50
+      flow: "hsl(var(--primary))"
+    }
   },
   rainbow: {
     label: "Rainbow Flow",
@@ -49,9 +100,9 @@ const chartConfig = {
       violet: "#8b5cf6",  // Violet
       purple: "#a855f7",  // Purple
       pink: "#ec4899",    // Pink
-    },
-  },
-} satisfies ChartConfig
+    }
+  }
+}
 
 // Generate sample data for traffic flow
 const generateSankeyData = (complexity: 'simple' | 'medium' | 'complex' = 'medium', variant: 'default' | 'rainbow' = 'default') => {
@@ -167,14 +218,14 @@ const generateSankeyData = (complexity: 'simple' | 'medium' | 'complex' = 'mediu
   }
 }
 
-interface SankeyChartDemoProps {
+interface SankeyChartProps {
   data: {
-    nodes: Array<{ id: string; label: string; color: string }>
-    links: Array<{ source: string; target: string; value: number }>
+    nodes: SankeyNode[]
+    links: SankeyLink[]
   }
   title?: string
   description?: string
-  variant?: "default" | "gradient" | "pattern"
+  variant?: "default" | "gradient" | "rainbow"
 }
 
 const SankeyChartDemo = ({
@@ -182,41 +233,47 @@ const SankeyChartDemo = ({
   title = "Traffic Flow",
   description = "Website traffic flow analysis",
   variant = "default",
-}: SankeyChartDemoProps) => {
+}: SankeyChartProps) => {
   return (
     <Card className="w-[1200px]">
       <CardHeader className="items-center pb-4">
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="pb-4">
-        <ChartContainer
-          config={chartConfig}
-          className="h-[500px] w-full"
-        >
+      <CardContent>
+        <div className="aspect-[2/1] w-full">
           <ResponsiveSankey
             data={data}
             margin={{ top: 40, right: 140, bottom: 40, left: 140 }}
             align="justify"
-            colors={(node) => node.color || chartConfig.traffic.colors.flow}
+            colors={(node: any) => {
+              const nodeData = data.nodes.find(n => n.id === node.id)
+              return nodeData?.color || (variant === "rainbow" ? chartConfig.rainbow.colors.blue : chartConfig.traffic.colors.flow)
+            }}
             nodeOpacity={1}
             nodeThickness={18}
             nodeInnerPadding={3}
-            nodeSpacing={24}
             nodeBorderWidth={0}
+            nodeBorderColor={{
+              from: "color",
+              modifiers: [["darker", 0.8]]
+            }}
             linkOpacity={0.5}
-            linkHoverOpacity={0.8}
-            linkBlendMode="multiply"
-            enableLinkGradient={variant === "gradient"}
-            label={(node) => node.label}
+            linkHoverOthersOpacity={0.1}
+            enableLinkGradient={true}
+            label={(node: any) => {
+              const nodeData = data.nodes.find(n => n.id === node.id)
+              return nodeData?.label || node.id
+            }}
             labelPosition="outside"
             labelOrientation="horizontal"
             labelPadding={16}
-            labelTextColor="#374151"
-            animate={true}
-            motionConfig="gentle"
+            labelTextColor={{
+              from: "color",
+              modifiers: [["darker", 1]]
+            }}
           />
-        </ChartContainer>
+        </div>
       </CardContent>
     </Card>
   )

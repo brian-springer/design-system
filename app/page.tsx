@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { Card, CardContent } from "@/components/ui/card";
+import { DonutTotal } from "@/components/charts/donut-total";
 
 export default function Home() {
   return (

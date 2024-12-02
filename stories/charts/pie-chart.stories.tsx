@@ -64,8 +64,16 @@ const generatePieData = (trend: 'up' | 'down' | 'flat' = 'flat') => {
   }))
 }
 
-// Calculate trend from data
-const calculateTrend = (data: any[]) => {
+// Types
+type TrendDirection = "up" | "down" | "unchanged"
+type TrendData = {
+  direction: TrendDirection
+  value: number
+  period: string
+}
+
+// Function to calculate trend
+const calculateTrend = (data: any[]): TrendData => {
   const totalVisitors = data.reduce((sum, item) => sum + item.visitors, 0)
   const baseTotal = 925 // Sum of original visitors
 
@@ -78,19 +86,22 @@ const calculateTrend = (data: any[]) => {
   }
 }
 
+// Helper function to get badge variant
+const getBadgeVariant = (value: number): "default" | "destructive" | "outline" | "secondary" => {
+  if (value > 30) return "default"
+  if (value < 15) return "destructive"
+  return "secondary"
+}
+
 // Component for displaying trend badge
-const getTrendBadge = (trend: { direction: "up" | "down" | "unchanged", value: number, period: string }) => {
+const getTrendBadge = (trend: TrendData) => {
   const icon = {
     up: <TrendingUp className="h-3 w-3" />,
     down: <TrendingDown className="h-3 w-3" />,
     unchanged: <Minus className="h-3 w-3" />
   }[trend.direction]
   
-  const variant = {
-    up: "default",
-    down: "destructive",
-    unchanged: "secondary"
-  }[trend.direction]
+  const variant = getBadgeVariant(trend.value)
   
   return (
     <Badge variant={variant} className="ml-2 px-1.5 py-0.5 font-medium">
@@ -106,11 +117,7 @@ interface PieChartDemoProps {
   data: Array<{ browser: string; visitors: number; fill: string }>
   title?: string
   description?: string
-  trend?: {
-    direction: "up" | "down" | "unchanged"
-    value: number
-    period: string
-  }
+  trend?: TrendData
   variant?: "default" | "donut" | "separated" | "labeled" | "interactive" | "donutActive" | "donutInteractive" | "donutLabeled"
   showLegend?: boolean
 }
@@ -131,25 +138,44 @@ const PieChartDemo = ({
     }
   }
 
-  const renderLabel = (props: any) => {
+  const renderCustomizedLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+    index,
+    value,
+    name,
+  }: any) => {
     const RADIAN = Math.PI / 180
-    const { cx, cy, midAngle, outerRadius, percent, name } = props
-    const sin = Math.sin(-RADIAN * midAngle)
-    const cos = Math.cos(-RADIAN * midAngle)
-    const x = cx + (outerRadius + 30) * cos
-    const y = cy + (outerRadius + 30) * sin
-    const textAnchor = cos >= 0 ? 'start' : 'end'
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+    const x = cx + radius * Math.cos(-midAngle * RADIAN)
+    const y = cy + radius * Math.sin(-midAngle * RADIAN)
+    const percentage = (percent * 100).toFixed(0)
 
     return (
-      <text
-        x={x}
-        y={y}
-        textAnchor={textAnchor}
-        fill="#374151" // gray-700
-        className="text-xs font-medium"
-      >
-        {`${name} (${(percent * 100).toFixed(0)}%)`}
-      </text>
+      <g>
+        <text
+          x={x}
+          y={y}
+          fill="hsl(var(--foreground))"
+          textAnchor={x > cx ? 'start' : 'end'}
+          dominantBaseline="central"
+          className="text-xs font-medium"
+        >
+          {name} ({percentage}%)
+        </text>
+        <foreignObject x={x - 20} y={y - 10} width={40} height={20}>
+          <Badge
+            variant={getBadgeVariant(Number(percentage))}
+            className="absolute"
+          >
+            {value.toLocaleString()}
+          </Badge>
+        </foreignObject>
+      </g>
     )
   }
 
@@ -220,7 +246,7 @@ const PieChartDemo = ({
                 nameKey="browser"
                 cx="50%"
                 cy="50%"
-                label={showLabels ? renderLabel : undefined}
+                label={showLabels ? renderCustomizedLabel : undefined}
                 labelLine={showLabels}
                 innerRadius={getInnerRadius()}
                 outerRadius="80%"

@@ -11,7 +11,8 @@ import {
   RectangleProps,
   Scatter,
   Legend,
-  Tooltip
+  Tooltip,
+  TooltipProps
 } from "recharts"
 
 import {
@@ -251,7 +252,11 @@ const BoxPlotDemo = ({
   const transformedData = useBoxPlot(data)
 
   // Custom tooltip
-  const renderTooltip = ({ payload, label, active }) => {
+  const renderTooltip = ({ 
+    payload, 
+    label, 
+    active 
+  }: TooltipProps<number, string>) => {
     if (!active || !payload) return null
 
     const boxPlotData = data.find(d => d.label === label)

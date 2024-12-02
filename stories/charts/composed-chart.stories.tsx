@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  TooltipProps,
 } from "recharts"
 import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 
@@ -24,73 +25,45 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-  ChartConfig,
-  ChartContainer,
-} from "@/components/ui/chart"
 
-// Chart configuration
-const chartConfig = {
-  volume: {
-    label: "Volume",
-    color: "#e0f2fe", // sky-100
-  },
-  trend: {
-    label: "Trend",
-    color: "#0369a1", // sky-700
-  },
-  revenue: {
-    label: "Revenue",
-    color: "#22c55e", // green-500
-  },
-  profit: {
-    label: "Profit",
-    color: "#f43f5e", // rose-500
-  },
-  target: {
-    label: "Target",
-    color: "#8b5cf6", // violet-500
-  }
-} satisfies ChartConfig
-
-// Style configuration
-const chartStyles = {
-  bar: {
-    primary: {
-      fill: "#e0f2fe",     // sky-100
-      stroke: "#7dd3fc",   // sky-300
-    },
-    secondary: {
-      fill: "#bbf7d0",     // green-200
-      stroke: "#86efac",   // green-300
-    }
-  },
-  line: {
-    primary: {
-      stroke: "#0369a1",   // sky-700
-      activeDot: "#0ea5e9" // sky-500
-    },
-    secondary: {
-      stroke: "#f43f5e",   // rose-500
-      activeDot: "#fda4af" // rose-300
-    }
-  },
-  area: {
-    primary: {
-      fill: "#e0f2fe",     // sky-100
-      stroke: "#7dd3fc",   // sky-300
-    }
-  }
+// Types for different chart variants
+type RevenueData = {
+  month: string
+  volume: number
+  trend: number
+  target: number
 }
 
+type PerformanceData = {
+  quarter: string
+  actual: number
+  target: number
+  variance: number
+}
+
+type ComparisonData = {
+  month: string
+  revenue: number
+  profit: number
+  target: number
+}
+
+type StackedData = {
+  month: string
+  directRevenue: number
+  indirectRevenue: number
+  trend: number
+}
+
+type ComposedData = RevenueData | PerformanceData | ComparisonData | StackedData
+
 // Generate sample data
-const generateComposedData = (variant: 'revenue' | 'performance' | 'comparison' | 'stacked' = 'revenue') => {
+const generateComposedData = (variant: 'revenue' | 'performance' | 'comparison' | 'stacked' = 'revenue'): ComposedData[] => {
   const generateNoise = (base: number, variance: number) => 
     base + (Math.random() - 0.5) * variance
 
   if (variant === 'revenue') {
-    // Revenue data with volume bars and trend line
-    return Array.from({ length: 12 }, (_, i) => {
+    return Array.from({ length: 12 }, (_, i): RevenueData => {
       const base = 1000 + i * 100 + generateNoise(0, 200)
       return {
         month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
@@ -102,8 +75,7 @@ const generateComposedData = (variant: 'revenue' | 'performance' | 'comparison' 
   }
 
   if (variant === 'performance') {
-    // Performance metrics with bars and overlaid line
-    return Array.from({ length: 6 }, (_, i) => {
+    return Array.from({ length: 4 }, (_, i): PerformanceData => {
       const base = 80 + i * 5
       return {
         quarter: `Q${i + 1}`,
@@ -115,21 +87,18 @@ const generateComposedData = (variant: 'revenue' | 'performance' | 'comparison' 
   }
 
   if (variant === 'comparison') {
-    // Revenue vs Profit comparison
-    return Array.from({ length: 12 }, (_, i) => {
+    return Array.from({ length: 12 }, (_, i): ComparisonData => {
       const revenue = 1000 + i * 100 + generateNoise(0, 200)
-      const profitMargin = 0.2 + generateNoise(0, 0.1)
       return {
         month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
         revenue: Math.round(revenue),
-        profit: Math.round(revenue * profitMargin),
+        profit: Math.round(revenue * 0.3),
         target: Math.round(revenue * 0.25)
       }
     })
   }
 
-  // Stacked metrics
-  return Array.from({ length: 12 }, (_, i) => {
+  return Array.from({ length: 12 }, (_, i): StackedData => {
     const baseRevenue = 1000 + i * 100
     return {
       month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
@@ -140,55 +109,86 @@ const generateComposedData = (variant: 'revenue' | 'performance' | 'comparison' 
   })
 }
 
-// Calculate trend
-const calculateTrend = (data: any[], key: string = 'trend') => {
-  const values = data.map(d => d[key]).filter(v => v !== null)
-  if (values.length < 2) return { direction: "unchanged", value: 0, period: "period" }
-  
-  const change = ((values[values.length - 1] - values[0]) / values[0]) * 100
-  return {
-    direction: change > 1 ? "up" : change < -1 ? "down" : "unchanged",
-    value: Math.abs(Math.round(change * 10) / 10),
-    period: "period"
+// Calculate trend direction
+type TrendDirection = 'up' | 'down' | 'neutral'
+
+const calculateTrend = (data: ComposedData[]): TrendDirection => {
+  const getValue = (item: ComposedData): number => {
+    if ('volume' in item) return item.volume
+    if ('actual' in item) return item.actual
+    if ('revenue' in item) return item.revenue
+    return item.directRevenue + item.indirectRevenue
   }
+
+  const values = data.map(getValue)
+  const average = values.reduce((a, b) => a + b, 0) / values.length
+  const lastValue = values[values.length - 1]
+  
+  if (lastValue > average * 1.1) return 'up'
+  if (lastValue < average * 0.9) return 'down'
+  return 'neutral'
 }
 
 // Trend badge component
-const getTrendBadge = (trend: { direction: "up" | "down" | "unchanged", value: number, period: string }) => {
+const getTrendBadge = (trend: TrendDirection) => {
   const icon = {
     up: <TrendingUp className="h-3 w-3" />,
     down: <TrendingDown className="h-3 w-3" />,
-    unchanged: <Minus className="h-3 w-3" />
-  }[trend.direction]
-  
-  const variant = {
+    neutral: <Minus className="h-3 w-3" />
+  }[trend]
+
+  const variantMap = {
     up: "default",
     down: "destructive",
-    unchanged: "secondary"
-  }[trend.direction]
-  
+    neutral: "secondary"
+  } satisfies Record<TrendDirection, "default" | "destructive" | "secondary">
+
+  const variant = variantMap[trend]
+
   return (
     <Badge variant={variant} className="ml-2 px-1.5 py-0.5 font-medium">
-      <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-1">
         {icon}
-        {trend.value}% this {trend.period}
+        {trend === 'up' ? 'Trending Up' : trend === 'down' ? 'Trending Down' : 'Stable'}
       </span>
     </Badge>
   )
 }
 
+// Props type for the chart component
 interface ComposedChartDemoProps {
-  data: any[]
+  data: ComposedData[]
   title?: string
   description?: string
-  trend?: {
-    direction: "up" | "down" | "unchanged"
-    value: number
-    period: string
-  }
-  variant?: "revenue" | "performance" | "comparison" | "stacked"
+  trend?: TrendDirection
+  variant?: 'revenue' | 'performance' | 'comparison' | 'stacked'
 }
 
+// Custom tooltip component
+const renderTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+  if (!active || !payload?.length) return null
+
+  return (
+    <div className="rounded-lg border bg-background p-2 shadow-sm">
+      <div className="grid gap-2">
+        <div className="font-medium">{label}</div>
+        {payload.map((entry, index) => {
+          if (!entry || typeof entry.value === 'undefined') return null
+          return (
+            <div key={index} className="grid grid-cols-2 gap-2">
+              <span className="text-muted-foreground">{entry.name}:</span>
+              <span className="font-medium" style={{ color: entry.color }}>
+                {entry.value.toLocaleString()}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Chart rendering logic
 const ComposedChartDemo = ({
   data,
   title = "Revenue Metrics",
@@ -196,155 +196,57 @@ const ComposedChartDemo = ({
   trend,
   variant = "revenue"
 }: ComposedChartDemoProps) => {
-  // Custom tooltip
-  const renderTooltip = ({ payload, label, active }) => {
-    if (!active || !payload) return null
-
-    return (
-      <div className="rounded-lg border bg-background p-2 shadow-sm">
-        <div className="grid gap-2">
-          <div className="font-medium">{label}</div>
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">{entry.name}:</span>
-              <span className="font-medium" style={{ color: entry.color }}>
-                {entry.value.toLocaleString()}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const renderChart = () => {
-    switch (variant) {
-      case 'revenue':
-        return (
-          <>
-            <Bar
-              dataKey="volume"
-              fill={chartStyles.bar.primary.fill}
-              stroke={chartStyles.bar.primary.stroke}
-              strokeWidth={1}
-            />
-            <Line
-              type="monotone"
-              dataKey="trend"
-              stroke={chartStyles.line.primary.stroke}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="target"
-              stroke={chartConfig.target.color}
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              dot={false}
-            />
-          </>
-        )
-      
-      case 'performance':
-        return (
-          <>
-            <Bar
-              dataKey="actual"
-              fill={chartStyles.bar.primary.fill}
-              stroke={chartStyles.bar.primary.stroke}
-            />
-            <Line
-              type="monotone"
-              dataKey="target"
-              stroke={chartStyles.line.primary.stroke}
-              strokeWidth={2}
-            />
-            <ReferenceLine y={0} stroke="#374151" />
-            <Bar
-              dataKey="variance"
-              fill={chartStyles.bar.secondary.fill}
-              stroke={chartStyles.bar.secondary.stroke}
-            />
-          </>
-        )
-      
-      case 'comparison':
-        return (
-          <>
-            <Bar
-              dataKey="revenue"
-              fill={chartStyles.bar.primary.fill}
-              stroke={chartStyles.bar.primary.stroke}
-            />
-            <Bar
-              dataKey="profit"
-              fill={chartStyles.bar.secondary.fill}
-              stroke={chartStyles.bar.secondary.stroke}
-            />
-            <Line
-              type="monotone"
-              dataKey="target"
-              stroke={chartConfig.target.color}
-              strokeWidth={2}
-              strokeDasharray="5 5"
-            />
-          </>
-        )
-      
-      case 'stacked':
-        return (
-          <>
-            <Bar
-              dataKey="directRevenue"
-              stackId="revenue"
-              fill={chartStyles.bar.primary.fill}
-              stroke={chartStyles.bar.primary.stroke}
-            />
-            <Bar
-              dataKey="indirectRevenue"
-              stackId="revenue"
-              fill={chartStyles.bar.secondary.fill}
-              stroke={chartStyles.bar.secondary.stroke}
-            />
-            <Line
-              type="monotone"
-              dataKey="trend"
-              stroke={chartStyles.line.primary.stroke}
-              strokeWidth={2}
-              dot={false}
-            />
-          </>
-        )
-    }
-  }
-
   return (
-    <Card className="w-[800px]">
+    <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer className="h-[400px]" config={chartConfig}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey={variant === 'performance' ? 'quarter' : 'month'}
-                tick={{ fill: "#374151" }}
-                tickLine={{ stroke: "#374151" }}
-              />
-              <YAxis
-                tick={{ fill: "#374151" }}
-                tickLine={{ stroke: "#374151" }}
-              />
-              <Tooltip content={renderTooltip} />
-              {renderChart()}
-              <Legend />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </ChartContainer>
+        <ResponsiveContainer width="100%" height={350}>
+          <ComposedChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis
+              dataKey={variant === "performance" ? "quarter" : "month"}
+              tick={{ fill: "hsl(var(--foreground))" }}
+              tickLine={{ stroke: "hsl(var(--foreground))" }}
+            />
+            <YAxis
+              tick={{ fill: "hsl(var(--foreground))" }}
+              tickLine={{ stroke: "hsl(var(--foreground))" }}
+            />
+            <Tooltip content={renderTooltip} />
+            {variant === 'revenue' && (
+              <>
+                <Bar dataKey="volume" fill="hsl(var(--primary))" />
+                <Line type="monotone" dataKey="trend" stroke="hsl(var(--primary))" dot={false} />
+                <ReferenceLine y={(data[0] as RevenueData).target} stroke="hsl(var(--muted))" strokeDasharray="3 3" />
+              </>
+            )}
+            {variant === 'performance' && (
+              <>
+                <Bar dataKey="actual" fill="hsl(var(--primary))" />
+                <Bar dataKey="target" fill="hsl(var(--muted))" />
+                <Line type="monotone" dataKey="variance" stroke="hsl(var(--primary))" dot={false} />
+              </>
+            )}
+            {variant === 'comparison' && (
+              <>
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" />
+                <Bar dataKey="profit" fill="hsl(var(--muted))" />
+                <Line type="monotone" dataKey="target" stroke="hsl(var(--primary))" dot={false} />
+              </>
+            )}
+            {variant === 'stacked' && (
+              <>
+                <Bar dataKey="directRevenue" stackId="revenue" fill="hsl(var(--primary))" />
+                <Bar dataKey="indirectRevenue" stackId="revenue" fill="hsl(var(--muted))" />
+                <Line type="monotone" dataKey="trend" stroke="hsl(var(--primary))" dot={false} />
+              </>
+            )}
+            <Legend />
+          </ComposedChart>
+        </ResponsiveContainer>
       </CardContent>
       <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
@@ -363,8 +265,16 @@ const meta: Meta<typeof ComposedChartDemo> = {
   title: "Charts/ComposedChart",
   component: ComposedChartDemo,
   parameters: {
-    layout: "centered",
-  },
+    layout: {
+      fullscreen: true,
+      padding: "2rem"
+    },
+    docs: {
+      description: {
+        component: "A composed chart component that supports multiple data visualization types."
+      }
+    }
+  }
 }
 
 export default meta
@@ -372,7 +282,7 @@ type Story = StoryObj<typeof ComposedChartDemo>
 
 export const VolumeAndTrend: Story = {
   render: () => {
-    const [data] = useState(() => generateComposedData('revenue'))
+    const [data] = useState<RevenueData[]>(() => generateComposedData('revenue') as RevenueData[])
     const trend = calculateTrend(data)
     return (
       <ComposedChartDemo 
@@ -383,13 +293,13 @@ export const VolumeAndTrend: Story = {
         description="Monthly sales volume with trend line"
       />
     )
-  },
+  }
 }
 
 export const PerformanceMetrics: Story = {
   render: () => {
-    const [data] = useState(() => generateComposedData('performance'))
-    const trend = calculateTrend(data, 'actual')
+    const [data] = useState<PerformanceData[]>(() => generateComposedData('performance') as PerformanceData[])
+    const trend = calculateTrend(data)
     return (
       <ComposedChartDemo 
         data={data}
@@ -399,13 +309,13 @@ export const PerformanceMetrics: Story = {
         description="Quarterly performance vs target with variance"
       />
     )
-  },
+  }
 }
 
 export const RevenueComparison: Story = {
   render: () => {
-    const [data] = useState(() => generateComposedData('comparison'))
-    const trend = calculateTrend(data, 'revenue')
+    const [data] = useState<ComparisonData[]>(() => generateComposedData('comparison') as ComparisonData[])
+    const trend = calculateTrend(data)
     return (
       <ComposedChartDemo 
         data={data}
@@ -415,12 +325,12 @@ export const RevenueComparison: Story = {
         description="Monthly revenue and profit analysis"
       />
     )
-  },
+  }
 }
 
 export const StackedRevenue: Story = {
   render: () => {
-    const [data] = useState(() => generateComposedData('stacked'))
+    const [data] = useState<StackedData[]>(() => generateComposedData('stacked') as StackedData[])
     const trend = calculateTrend(data)
     return (
       <ComposedChartDemo 
@@ -431,5 +341,5 @@ export const StackedRevenue: Story = {
         description="Direct and indirect revenue with trend"
       />
     )
-  },
+  }
 }

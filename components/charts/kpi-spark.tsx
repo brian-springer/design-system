@@ -151,7 +151,7 @@ const LineSparkline = ({
 
   const isProjectedOverGoal = projected > goal
   
-  const allValues = [...historicalData.map(d => d.value), actual, projected, goal]
+  const allValues = [...(historicalData?.map(d => d.value) || []), actual, projected, goal]
   const maxValue = Math.max(...allValues) * 1.1
   const minValue = Math.min(...allValues) * 0.9
   
@@ -164,8 +164,8 @@ const LineSparkline = ({
   const goalY = getY(goal)
 
   // Calculate points for the actual data (75% of width)
-  const actualPoints = historicalData
-    .slice(0, Math.floor(historicalData.length * 0.75))
+  const actualPoints = (historicalData || [])
+    .slice(0, Math.floor((historicalData || []).length * 0.75))
     .map((d, i, arr) => {
       const x = (i / (arr.length - 1)) * width
       const y = getY(d.value)

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import type { Meta, StoryObj } from "@storybook/react"
 import { TrendingUp, TrendingDown, Minus, Clock, Calendar, CalendarDays, CalendarRange } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,9 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
+  ComposedChart,
+  ReferenceLine,
+  Tooltip,
 } from "recharts"
 
 import {
@@ -50,132 +53,149 @@ const formatDate = (date: Date, granularity: 'day' | 'week' | 'month' | 'quarter
 }
 
 // Generate data for different time ranges
-const generateTimeRangeData = (timeRange: string, baseValue: number, trend: 'up' | 'down' | 'flat' = 'flat') => {
-  const now = new Date()
-  let data: { date: string; value: number }[] = []
-  
+const getTimeRangeDays = (timeRange: string) => {
   switch (timeRange) {
-    case "30d": {
-      // Daily data for last 30 days
-      data = Array.from({ length: 30 }, (_, i) => {
-        const date = new Date(now)
-        date.setDate(date.getDate() - (29 - i))
-        const trendFactor = trend === 'up' ? (i / 30) * 50 : 
-                          trend === 'down' ? ((30 - i) / 30) * 50 : 0
-        const randomVariation = (Math.random() - 0.5) * 20
-        return {
-          date: formatDate(date, 'day'),
-          value: Math.round(baseValue + trendFactor + randomVariation)
-        }
-      })
-      break
-    }
-    case "12m": {
-      // Monthly data for last 12 months
-      data = Array.from({ length: 12 }, (_, i) => {
-        const date = new Date(now)
-        date.setMonth(date.getMonth() - (11 - i))
-        const trendFactor = trend === 'up' ? (i / 12) * 200 : 
-                          trend === 'down' ? ((12 - i) / 12) * 200 : 0
-        const randomVariation = (Math.random() - 0.5) * 50
-        return {
-          date: formatDate(date, 'month'),
-          value: Math.round(baseValue + trendFactor + randomVariation)
-        }
-      })
-      break
-    }
-    case "quarter": {
-      // Weekly data for last quarter (13 weeks)
-      data = Array.from({ length: 13 }, (_, i) => {
-        const date = new Date(now)
-        date.setDate(date.getDate() - (12 - i) * 7)
-        const trendFactor = trend === 'up' ? (i / 13) * 100 : 
-                          trend === 'down' ? ((13 - i) / 13) * 100 : 0
-        const randomVariation = (Math.random() - 0.5) * 30
-        return {
-          date: formatDate(date, 'week'),
-          value: Math.round(baseValue + trendFactor + randomVariation)
-        }
-      })
-      break
-    }
-    case "ytd": {
-      // Monthly data for year to date
-      const currentMonth = now.getMonth()
-      data = Array.from({ length: currentMonth + 1 }, (_, i) => {
-        const date = new Date(now.getFullYear(), i, 1)
-        const trendFactor = trend === 'up' ? (i / (currentMonth + 1)) * 150 : 
-                          trend === 'down' ? ((currentMonth + 1 - i) / (currentMonth + 1)) * 150 : 0
-        const randomVariation = (Math.random() - 0.5) * 40
-        return {
-          date: formatDate(date, 'month'),
-          value: Math.round(baseValue + trendFactor + randomVariation)
-        }
-      })
-      break
-    }
+    case "7d":
+      return 7
+    case "14d":
+      return 14
+    case "30d":
+      return 30
+    default:
+      return 30
   }
-  return data
+}
+
+const generateTimeRangeData = (timeRange: string) => {
+  const days = getTimeRangeDays(timeRange)
+  const now = new Date()
+  
+  return Array.from({ length: days }).map((_, i) => {
+    const date = new Date(now)
+    date.setDate(date.getDate() - (days - i - 1))
+    
+    // Base value with some randomization
+    const baseValue = 500 + Math.random() * 200
+    
+    // Add trend based on position in the range
+    const trendFactor = (i / days) * 300 // Gradually increase over time
+    const randomVariation = (Math.random() - 0.5) * 100 // Add some noise
+    
+    return {
+      name: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: Math.round(baseValue + trendFactor + randomVariation)
+    }
+  })
 }
 
 // Generate different datasets based on time range
+interface TrendData {
+  name: string
+  [key: string]: string | number
+}
+
 const generateDatasets = (timeRange: string) => {
-  const baseData = generateTimeRangeData(timeRange, 500, 'up')
+  const baseData = generateTimeRangeData(timeRange)
   
   return {
     single: baseData.map(item => ({
-      date: item.date,
+      name: item.name,
       visitors: item.value
     })),
     multiple: baseData.map(item => ({
-      date: item.date,
+      name: item.name,
       desktop: Math.round(item.value * 0.6),
       mobile: Math.round(item.value * 0.4)
     })),
     stacked: baseData.map(item => ({
-      date: item.date,
+      name: item.name,
       desktop: Math.round(item.value * 0.5),
       mobile: Math.round(item.value * 0.3),
       tablet: Math.round(item.value * 0.2)
     })),
     negative: baseData.map(item => ({
-      date: item.date,
-      value: item.value * (Math.random() > 0.5 ? 1 : -1)
+      name: item.name,
+      value: Math.round(item.value * (Math.random() > 0.5 ? 1 : -1))
     }))
   }
 }
 
 // Calculate trend from data
-const calculateTrend = (
-  data: { date: string; [key: string]: string | number }[], 
-  timeRange: string
-): { direction: "up" | "down" | "unchanged"; value: number; period: string; } | undefined => {
-  if (data.length < 2) return undefined
-  
-  // Get the first numeric value (excluding date)
-  const getTotal = (item: any) => {
-    const numericValues = Object.entries(item)
-      .filter(([key, value]) => key !== 'date' && typeof value === 'number')
-      .reduce((sum, [_, value]) => sum + (value as number), 0)
-    return numericValues
+const calculateTrend = (data: TrendData[], timeRange: string) => {
+  if (!data.length) {
+    return {
+      direction: "unchanged" as const,
+      value: 0,
+      period: timeRange
+    }
   }
 
-  const firstValue = getTotal(data[0])
-  const lastValue = getTotal(data[data.length - 1])
-  const percentChange = ((lastValue - firstValue) / firstValue) * 100
+  const firstValue = Number(Object.values(data[0]).find(v => typeof v === 'number')) || 0
+  const lastValue = Number(Object.values(data[data.length - 1]).find(v => typeof v === 'number')) || 0
+  const difference = lastValue - firstValue
+  const percentageChange = (difference / firstValue) * 100
 
   return {
-    value: Math.abs(Math.round(percentChange * 10) / 10),
-    direction: percentChange > 0 ? "up" : percentChange < 0 ? "down" : "unchanged",
-    period: timeRange === "30d" ? "month" : 
-           timeRange === "12m" ? "year" : 
-           timeRange === "quarter" ? "quarter" : "ytd"
+    direction: difference > 0 ? "up" as const : difference < 0 ? "down" as const : "unchanged" as const,
+    value: Math.abs(Math.round(percentageChange * 10) / 10),
+    period: timeRange
   }
 }
 
+interface HistoricalDataPoint {
+  name: string
+  value: number
+}
+
+interface RegularDataPoint {
+  name: string
+  [key: string]: string | number  // Allow string indexing for dynamic keys
+}
+
+const generateHistoricalData = (timeRange: string) => {
+  const days = getTimeRangeDays(timeRange)
+  const now = new Date()
+  return Array.from({ length: days }).map((_, i) => {
+    const date = new Date(now)
+    date.setDate(date.getDate() - (days - i - 1))
+    return {
+      name: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: Math.floor(Math.random() * 1000)
+    }
+  })
+}
+
+interface BarChartConfigItem {
+  color: string
+  label?: string
+}
+
+interface BarChartData {
+  [key: string]: BarChartConfigItem
+}
+
+interface BarChartProps {
+  title?: string
+  description?: string
+  historicalData?: HistoricalDataPoint[]
+  actual?: number
+  projected?: number
+  goal?: number
+  data?: RegularDataPoint[]
+  config?: BarChartData
+  stacked?: boolean
+  showLabels?: boolean
+  onTimeRangeChange?: (range: string) => void
+  trend?: {
+    direction: "up" | "down" | "unchanged"
+    value: number
+    period: string
+  }
+  variant?: "default" | "destructive" | "secondary" | "negative"
+}
+
 // Multiple bars config
-const multipleConfig = {
+const multipleConfig: BarChartData = {
   desktop: {
     label: "Desktop",
     color: "hsl(var(--chart-1))",
@@ -184,18 +204,18 @@ const multipleConfig = {
     label: "Mobile",
     color: "hsl(var(--chart-3))",
   },
-} satisfies ChartConfig
+} 
 
 // Single bar config
-const singleConfig = {
+const singleConfig: BarChartData = {
   visitors: {
     label: "Visitors",
     color: "hsl(var(--chart-1))",
   },
-} satisfies ChartConfig
+} 
 
 // Stacked config
-const stackedConfig = {
+const stackedConfig: BarChartData = {
   desktop: {
     label: "Desktop",
     color: "hsl(var(--chart-1))",
@@ -208,54 +228,33 @@ const stackedConfig = {
     label: "Tablet",
     color: "hsl(var(--chart-3))",
   },
-} satisfies ChartConfig
+} 
 
 // Negative config
-const negativeConfig = {
+const negativeConfig: BarChartData = {
   value: {
     label: "Profit/Loss",
     color: "hsl(var(--chart-1))",
   },
-} satisfies ChartConfig
+} 
 
 const TIME_RANGES = [
   {
-    label: "Last 30 days",
-    value: "30d",
-    icon: CalendarDays,
-  },
-  {
-    label: "Last 12 months",
-    value: "12m",
+    label: "7 days",
+    value: "7d",
     icon: Calendar,
   },
   {
-    label: "Last quarter",
-    value: "quarter",
-    icon: CalendarRange,
+    label: "14 days",
+    value: "14d",
+    icon: Calendar,
   },
   {
-    label: "Year to date",
-    value: "ytd",
-    icon: Clock,
+    label: "30 days",
+    value: "30d",
+    icon: Calendar,
   },
-]
-
-interface BarChartProps {
-  data: { date: string; [key: string]: string | number }[]
-  config: ChartConfig
-  title?: string
-  description?: string
-  trend?: {
-    direction: "up" | "down" | "unchanged"
-    value: number
-    period: string
-  }
-  variant?: "default" | "destructive" | "secondary" | "negative"
-  stacked?: boolean
-  showLabels?: boolean
-  onTimeRangeChange?: (range: string) => void
-}
+] as const
 
 const getTrendBadge = (trend?: { direction: "up" | "down" | "unchanged", value: number, period: string }) => {
   if (!trend) return null
@@ -266,11 +265,13 @@ const getTrendBadge = (trend?: { direction: "up" | "down" | "unchanged", value: 
     unchanged: <Minus className="h-3 w-3" />
   }[trend.direction]
   
-  const variant: "default" | "destructive" | "secondary" = {
+  const variantMap = {
     up: "default",
     down: "destructive",
     unchanged: "secondary"
-  }[trend.direction]
+  } as const
+  
+  const variant = variantMap[trend.direction]
   
   return (
     <Badge variant={variant} className="ml-2 px-1.5 py-0.5 font-medium">
@@ -283,15 +284,19 @@ const getTrendBadge = (trend?: { direction: "up" | "down" | "unchanged", value: 
 }
 
 const BarChartDemo = ({
+  title = "Performance Metrics",
+  description = "Historical and projected performance analysis",
+  historicalData = [],
+  actual,
+  projected,
+  goal,
   data,
   config,
-  title,
-  description,
-  trend,
-  variant = "default",
   stacked = false,
   showLabels = false,
   onTimeRangeChange,
+  trend,
+  variant = "default"
 }: BarChartProps) => {
   const [currentTimeRange, setCurrentTimeRange] = useState("30d")
 
@@ -306,44 +311,159 @@ const BarChartDemo = ({
     icon: <opt.icon size={16} />,
   }))
 
-  const dataKeys = Object.keys(config)
-  const isNegative = variant === "negative"
+  const renderChart = () => {
+    const isHistorical = Boolean(historicalData?.length)
+    const chartHeight = 350
 
-  const getBarFill = (entry: any) => {
-    const value = entry?.value
-    return value < 0 
-      ? "#94a3b8" // slate-400
-      : "#059669" // emerald-600
-  }
-
-  const getTrendIcon = () => {
-    switch (trend?.direction) {
-      case "up":
-        return <TrendingUp className="h-4 w-4 text-emerald-500" />
-      case "down":
-        return <TrendingDown className="h-4 w-4 text-red-500" />
-      case "unchanged":
-        return <Minus className="h-4 w-4 text-slate-500" />
-      default:
-        return null
+    const formatXAxis = (value: string) => {
+      const date = new Date(value)
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric'
+      })
     }
-  }
 
-  const getTrendText = () => {
-    if (!trend) return null
-    const prefix = trend.direction === "unchanged" ? "" : trend.direction === "up" ? "up by" : "down by"
-    const className = {
-      up: "text-emerald-500",
-      down: "text-red-500",
-      unchanged: "text-slate-500"
-    }[trend.direction]
-    
-    return trend.direction === "unchanged" ? (
-      <span className={className}>Unchanged this month</span>
-    ) : (
-      <span className={className}>
-        {prefix} {Math.abs(trend.value)}% this month
-      </span>
+    if (isHistorical) {
+      if (!actual || !projected || !goal) return null
+
+      const defaultConfig = {
+        value: {
+          color: "hsl(var(--primary))",
+          label: "Value"
+        }
+      }
+
+      return (
+        <ChartContainer config={defaultConfig} className="h-full w-full">
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <ComposedChart data={historicalData}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis 
+                dataKey="name" 
+                stroke="#888888"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={30}
+              />
+              <YAxis
+                stroke="#888888"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent indicator="dashed" />}
+              />
+              <Bar 
+                dataKey="value" 
+                fill="hsl(var(--primary))" 
+                radius={[4, 4, 0, 0]} 
+                maxBarSize={40}
+              />
+              <ReferenceLine 
+                y={actual} 
+                stroke="hsl(var(--primary))" 
+                label={{ value: "Actual", position: "right", fill: "hsl(var(--primary))" }} 
+              />
+              <ReferenceLine 
+                y={projected} 
+                stroke="hsl(var(--secondary))" 
+                label={{ value: "Projected", position: "right", fill: "hsl(var(--secondary))" }} 
+              />
+              <ReferenceLine 
+                y={goal} 
+                stroke="hsl(var(--destructive))" 
+                label={{ value: "Goal", position: "right", fill: "hsl(var(--destructive))" }} 
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartContainer>
+      )
+    }
+
+    if (!data?.length || !config) return null
+
+    const processedConfig = Object.entries(config).reduce((acc, [key, value]) => {
+      acc[key] = {
+        color: value.color || `hsl(var(--chart-${Object.keys(acc).length * 2 + 1}))`,
+        label: value.label
+      }
+      return acc
+    }, {} as BarChartData)
+
+    return (
+      <ChartContainer config={processedConfig} className="h-full w-full">
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <BarChart
+            data={data}
+            margin={{
+              top: 5,
+              right: 5,
+              left: 5,
+              bottom: 5,
+            }}
+          >
+            <XAxis
+              dataKey="name"
+              stroke="#888888"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              minTickGap={30}
+            />
+            <YAxis
+              stroke="#888888"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => value.toLocaleString()}
+            />
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent indicator="dashed" />}
+            />
+            {Object.keys(processedConfig).map((key, index) => {
+              const isTopBar = stacked && index === Object.keys(processedConfig).length - 1
+              const radius: [number, number, number, number] = isTopBar
+                ? [4, 4, 0, 0]
+                : [0, 0, 0, 0]
+
+              return (
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  fill={variant === "negative" ? undefined : processedConfig[key].color}
+                  radius={radius}
+                  maxBarSize={40}
+                  stackId={stacked ? "stack" : undefined}
+                >
+                  {variant === "negative" && data.map((entry, index) => {
+                    const value = Number(entry[key])
+                    return (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={value < 0 ? "hsl(var(--destructive))" : "hsl(var(--primary))"}
+                      />
+                    )
+                  })}
+                  {showLabels && (
+                    <LabelList
+                      dataKey={key}
+                      position="top"
+                      className="fill-foreground text-xs"
+                    />
+                  )}
+                </Bar>
+              )
+            })}
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
     )
   }
 
@@ -355,82 +475,27 @@ const BarChartDemo = ({
             <CardTitle className="text-base font-normal">{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </div>
-          <SplitButton
-            options={timeRangeOptions}
-            variant="outline"
-            value={currentTimeRange}
-            onChange={handleTimeRangeChange}
-            persistent={true}
-          />
+          {onTimeRangeChange && (
+            <SplitButton
+              options={timeRangeOptions}
+              variant="outline"
+              value={currentTimeRange}
+              onChange={handleTimeRangeChange}
+              persistent={true}
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] w-full">
-          <ChartContainer config={config} className="h-full w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data}
-                margin={{
-                  top: 5,
-                  right: 5,
-                  left: 5,
-                  bottom: 5,
-                }}
-              >
-                <XAxis
-                  dataKey="date"
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}`}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dashed" />}
-                />
-                {dataKeys.map((key, index) => {
-                  const isTopBar = stacked && index === dataKeys.length - 1
-                  const radius: [number, number, number, number] = isTopBar
-                    ? [4, 4, 0, 0]
-                    : [0, 0, 0, 0]
-
-                  return (
-                    <Bar
-                      key={key}
-                      dataKey={key}
-                      fill={isNegative ? undefined : `hsl(var(--chart-${2 * index + 1}))`}
-                      radius={radius}
-                      maxBarSize={40}
-                      stackId={stacked ? "stack" : undefined}
-                    >
-                      {isNegative && data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={getBarFill(entry)} />
-                      ))}
-                      {showLabels && (
-                        <LabelList
-                          dataKey={key}
-                          position="top"
-                          className="fill-slate-900 dark:fill-slate-100"
-                        />
-                      )}
-                    </Bar>
-                  )
-                })}
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+        <div className="h-[350px] w-full">
+          {renderChart()}
         </div>
       </CardContent>
-      <CardFooter className="flex items-center gap-2 text-sm">
-        {getTrendBadge(trend)}
-      </CardFooter>
+      {trend && (
+        <CardFooter className="flex items-center gap-2 text-sm">
+          {getTrendBadge(trend)}
+        </CardFooter>
+      )}
     </Card>
   )
 }
@@ -449,26 +514,26 @@ type Story = StoryObj<typeof BarChartDemo>
 
 export const Single: Story = {
   render: () => {
+    const [timeRange, setTimeRange] = useState("30d")
     const [data, setData] = useState(() => {
       const baseData = generateDatasets("30d")
-      // Modify some values to create different trends
       const modifiedData = baseData.single.map((item, index) => {
         const value = item.visitors as number
         if (index < baseData.single.length / 3) {
-          return { ...item, visitors: value * 1.2 } // Upward trend
+          return { ...item, visitors: value * 1.2 }
         } else if (index < (baseData.single.length * 2) / 3) {
-          return { ...item, visitors: value * 0.8 } // Downward trend
+          return { ...item, visitors: value * 0.8 }
         }
-        return item // Unchanged trend
+        return item
       })
       return { ...baseData, single: modifiedData }
     })
 
-    const trend = calculateTrend(data.single, "30d")
+    const trend = calculateTrend(data.single, timeRange)
 
-    const handleTimeRangeChange = (timeRange: string) => {
-      const newData = generateDatasets(timeRange)
-      // Apply the same modifications to maintain the trend pattern
+    const handleTimeRangeChange = (newTimeRange: string) => {
+      setTimeRange(newTimeRange)
+      const newData = generateDatasets(newTimeRange)
       const modifiedData = newData.single.map((item, index) => {
         const value = item.visitors as number
         if (index < newData.single.length / 3) {
@@ -482,89 +547,147 @@ export const Single: Story = {
     }
 
     return (
-      <BarChartDemo
-        title="Total Revenue"
-        description="Revenue across all products"
-        data={data.single}
-        config={singleConfig}
-        trend={trend}
-        onTimeRangeChange={handleTimeRangeChange}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Total Revenue</CardTitle>
+          <CardDescription>Revenue across all products</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BarChartDemo
+            data={data.single}
+            config={singleConfig}
+            trend={trend}
+            onTimeRangeChange={handleTimeRangeChange}
+          />
+        </CardContent>
+      </Card>
     )
-  },
-}
-
-export const Multiple: Story = {
-  render: () => {
-    const [data, setData] = useState(generateDatasets("30d"))
-
-    const trend = calculateTrend(data.multiple, "30d")
-
-    return (
-      <BarChartDemo
-        title="Revenue by Channel"
-        description="Compare revenue across different channels"
-        data={data.multiple}
-        config={multipleConfig}
-        trend={trend}
-      />
-    )
-  },
-}
-
-export const Stacked: Story = {
-  render: () => {
-    const [data, setData] = useState(generateDatasets("30d"))
-
-    const trend = calculateTrend(data.stacked, "30d")
-
-    return (
-      <BarChartDemo
-        title="Revenue by Product"
-        description="Compare revenue across product lines"
-        data={data.stacked}
-        config={stackedConfig}
-        stacked={true}
-        trend={trend}
-      />
-    )
-  },
+  }
 }
 
 export const WithLabels: Story = {
   render: () => {
-    const [data, setData] = useState(generateDatasets("30d"))
-
-    const trend = calculateTrend(data.single, "30d")
+    const [timeRange, setTimeRange] = useState("30d")
+    const data = useMemo(() => {
+      const days = getTimeRangeDays(timeRange)
+      return Array.from({ length: days }, (_, i) => ({
+        name: new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: Math.floor(Math.random() * 1000) + 500
+      }))
+    }, [timeRange])
 
     return (
-      <BarChartDemo
-        title="Monthly Revenue"
-        description="Revenue for the current month"
-        data={data.single}
-        config={singleConfig}
-        showLabels={true}
-        trend={trend}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue Performance</CardTitle>
+          <CardDescription>Monthly revenue analysis and projections</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BarChartDemo
+            data={data}
+            config={{
+              value: {
+                color: "hsl(var(--primary))"
+              }
+            }}
+            showLabels={true}
+            trend={{
+              direction: "down",
+              value: 5,
+              period: "month"
+            }}
+            onTimeRangeChange={setTimeRange}
+          />
+        </CardContent>
+      </Card>
     )
-  },
+  }
+}
+
+
+export const Multiple: Story = {
+  render: () => {
+    const [timeRange, setTimeRange] = useState("30d")
+    const [data, setData] = useState(() => generateDatasets("30d"))
+
+    const handleTimeRangeChange = (newTimeRange: string) => {
+      setTimeRange(newTimeRange)
+      setData(generateDatasets(newTimeRange))
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Device Usage</CardTitle>
+          <CardDescription>Device usage by platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BarChartDemo
+            data={data.multiple}
+            config={multipleConfig}
+            onTimeRangeChange={handleTimeRangeChange}
+          />
+        </CardContent>
+      </Card>
+    )
+  }
+}
+
+export const Stacked: Story = {
+  render: () => {
+    const [timeRange, setTimeRange] = useState("30d")
+    const [data, setData] = useState(() => generateDatasets("30d"))
+
+    const handleTimeRangeChange = (newTimeRange: string) => {
+      setTimeRange(newTimeRange)
+      setData(generateDatasets(newTimeRange))
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Device Usage (Stacked)</CardTitle>
+          <CardDescription>Device usage by platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BarChartDemo
+            data={data.stacked}
+            config={stackedConfig}
+            stacked
+            showLabels
+            onTimeRangeChange={handleTimeRangeChange}
+          />
+        </CardContent>
+      </Card>
+    )
+  }
 }
 
 export const Negative: Story = {
   render: () => {
-    const [data, setData] = useState(generateDatasets("30d"))
+    const [timeRange, setTimeRange] = useState("30d")
+    const [data, setData] = useState(() => generateDatasets("30d"))
 
-    const trend = calculateTrend(data.negative, "30d")
+    const handleTimeRangeChange = (newTimeRange: string) => {
+      setTimeRange(newTimeRange)
+      setData(generateDatasets(newTimeRange))
+    }
 
     return (
-      <BarChartDemo
-        title="Profit/Loss"
-        description="Track profit and loss over time"
-        data={data.negative}
-        config={negativeConfig}
-        variant="negative"
-        trend={trend}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Profit/Loss</CardTitle>
+          <CardDescription>Monthly profit and loss</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BarChartDemo
+            data={data.negative}
+            config={negativeConfig}
+            variant="negative"
+            onTimeRangeChange={handleTimeRangeChange}
+          />
+        </CardContent>
+      </Card>
     )
-  },
+  }
 }

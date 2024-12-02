@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  TooltipProps,
 } from "recharts"
 import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 
@@ -25,7 +26,8 @@ import { Badge } from "@/components/ui/badge"
 import {
   ChartConfig,
   ChartContainer,
-} from "@/components/ui/chart"
+}
+from "@/components/ui/chart"
 
 // Chart configuration
 const chartConfig = {
@@ -68,18 +70,24 @@ const chartStyles = {
 }
 
 // Generate sample data with more variance
-const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'multiline' | 'curved' = 'performance') => {
+const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'multiline' | 'curved' = 'performance'): Array<{
+  month: string
+  range: [number, number]
+  actual: number | null
+  target?: number
+  benchmark?: number
+}> => {
   const generateNoise = (base: number, variance: number) => 
     base + (Math.random() - 0.5) * variance
 
   if (variant === 'multiline') {
     return [
-      { month: "Jan", range: [60, 80], actual: 75, target: 70, benchmark: 65 },
-      { month: "Feb", range: [65, 85], actual: 73, target: 72, benchmark: 68 },
-      { month: "Mar", range: [70, 90], actual: 82, target: 75, benchmark: 72 },
-      { month: "Apr", range: [75, 95], actual: 88, target: 78, benchmark: 76 },
-      { month: "May", range: [70, 100], actual: 85, target: 80, benchmark: 79 },
-      { month: "Jun", range: [80, 110], actual: 92, target: 85, benchmark: 83 },
+      { month: "Jan", range: [60, 80] as [number, number], actual: 75, target: 70, benchmark: 65 },
+      { month: "Feb", range: [65, 85] as [number, number], actual: 73, target: 72, benchmark: 68 },
+      { month: "Mar", range: [70, 90] as [number, number], actual: 82, target: 75, benchmark: 72 },
+      { month: "Apr", range: [75, 95] as [number, number], actual: 88, target: 78, benchmark: 76 },
+      { month: "May", range: [70, 100] as [number, number], actual: 85, target: 80, benchmark: 79 },
+      { month: "Jun", range: [80, 110] as [number, number], actual: 92, target: 85, benchmark: 83 },
     ]
   }
 
@@ -89,7 +97,7 @@ const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'm
       const base = 80 + Math.sin(i / 2) * 20
       return {
         month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
-        range: [base - 10 + generateNoise(0, 5), base + 10 + generateNoise(0, 5)],
+        range: [base - 10 + generateNoise(0, 5), base + 10 + generateNoise(0, 5)] as [number, number],
         actual: base + generateNoise(0, 8),
         target: base + 5 + generateNoise(0, 3)
       }
@@ -102,7 +110,7 @@ const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'm
       const base = 75 + i * 5 + generateNoise(0, 15)
       return {
         month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
-        range: [base - 10, base + 10],
+        range: [base - 10, base + 10] as [number, number],
         actual: base + generateNoise(0, 12)
       }
     })
@@ -114,7 +122,7 @@ const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'm
       const projected = base + i * 10 + generateNoise(0, 20)
       return {
         month: new Date(2024, i + 6).toLocaleString('default', { month: 'short' }),
-        range: [projected - 15, projected + 15],
+        range: [projected - 15, projected + 15] as [number, number],
         actual: i < 3 ? projected + generateNoise(0, 10) : null
       }
     })
@@ -125,7 +133,7 @@ const generateBandedData = (variant: 'performance' | 'forecast' | 'metrics' | 'm
     const base = 150 + i * 50 + generateNoise(0, 40)
     return {
       month: `Q${i + 1}`,
-      range: [base - 25, base + 25],
+      range: [base - 25, base + 25] as [number, number],
       actual: base + generateNoise(0, 30)
     }
   })
@@ -157,11 +165,13 @@ const BandedChartDemo = ({
   variant = "performance"
 }: BandedChartDemoProps) => {
   // Custom tooltip that excludes the range data
-  const renderTooltip = ({ payload, label, active }) => {
+  const renderTooltip = (props: TooltipProps<number, string>) => {
+    const { payload, label, active } = props
+    
     if (!active || !payload) return null
 
     const relevantData = payload.filter(p => 
-      ["actual", "target", "benchmark"].includes(p.dataKey)
+      ["actual", "target", "benchmark"].includes(String(p.dataKey))
     )
     
     if (relevantData.length === 0) return null
@@ -291,14 +301,23 @@ const BandedChartDemo = ({
 }
 
 // Calculate trend
-const calculateTrend = (data: any[]) => {
-  const lastActual = data.filter(d => d.actual !== null).slice(-2)
-  if (lastActual.length < 2) return { direction: "unchanged", value: 0, period: "period" }
-  
-  const change = ((lastActual[1].actual - lastActual[0].actual) / lastActual[0].actual) * 100
+const calculateTrend = (data: Array<{ actual: number | null }>): { 
+  direction: "up" | "down" | "unchanged"
+  value: number
+  period: string 
+} => {
+  const validData = data.filter((d): d is { actual: number } => d.actual !== null)
+  if (validData.length < 2) {
+    return { direction: "unchanged", value: 0, period: "period" }
+  }
+
+  const first = validData[0].actual
+  const last = validData[validData.length - 1].actual
+  const change = ((last - first) / first) * 100
+
   return {
-    direction: change > 1 ? "up" : change < -1 ? "down" : "unchanged",
-    value: Math.abs(Math.round(change * 10) / 10),
+    direction: change > 0 ? "up" : change < 0 ? "down" : "unchanged",
+    value: Math.abs(Math.round(change)),
     period: "period"
   }
 }
@@ -315,7 +334,7 @@ const getTrendBadge = (trend: { direction: "up" | "down" | "unchanged", value: n
     up: "default",
     down: "destructive",
     unchanged: "secondary"
-  }[trend.direction]
+  }[trend.direction] as "default" | "destructive" | "secondary"
   
   return (
     <Badge variant={variant} className="ml-2 px-1.5 py-0.5 font-medium">
@@ -331,7 +350,7 @@ const meta: Meta<typeof BandedChartDemo> = {
   title: "Charts/BandedChart",
   component: BandedChartDemo,
   parameters: {
-    layout: "centered",
+    layout: 'centered',
   },
 }
 

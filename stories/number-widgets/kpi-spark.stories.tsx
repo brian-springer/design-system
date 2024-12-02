@@ -7,95 +7,82 @@ interface KPISparkProps {
   actual: number
   projected: number
   goal: number
-  historicalData?: { value: number }[]
-  variant: "line" | "bar"
+  historicalData?: Array<{ value: number }>
+  variant?: "line" | "bar"
   size?: "sm" | "md" | "lg"
   title?: string
   unit?: string
 }
 
+const KPISpark = ({
+  actual = 0,
+  projected = 0,
+  goal = 0,
+  historicalData = [],
+  variant = "line",
+  size = "md",
+  title,
+  unit
+}: KPISparkProps) => {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        {variant === "line" ? (
+          <LineSparkline
+            actual={actual}
+            projected={projected}
+            goal={goal}
+            historicalData={historicalData}
+            size={size}
+            title={title}
+            unit={unit}
+          />
+        ) : (
+          <BarSparkline
+            actual={actual}
+            projected={projected}
+            goal={goal}
+            size={size}
+            title={title}
+            unit={unit}
+          />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 const sizeConfig = {
   sm: {
-    width: 280,
-    height: 140,
-    valueSize: "text-xl",
-    labelSize: "text-xs",
+    width: 300,
+    height: 100,
+    chartPadding: 32,
     barHeight: 8,
     tickHeight: 16,
-    padding: "p-3",
-    chartPadding: 80,
-    titleSize: "text-xs"
+    titleSize: "text-sm",
+    labelSize: "text-xs",
+    chartHeight: 40
   },
   md: {
-    width: 320,
-    height: 180,
-    valueSize: "text-2xl",
-    labelSize: "text-sm",
+    width: 400,
+    height: 120,
+    chartPadding: 32,
     barHeight: 12,
     tickHeight: 24,
-    padding: "p-4",
-    chartPadding: 90,
-    titleSize: "text-sm"
+    titleSize: "text-base",
+    labelSize: "text-sm",
+    chartHeight: 50
   },
   lg: {
-    width: 380,
-    height: 220,
-    valueSize: "text-3xl",
-    labelSize: "text-base",
+    width: 500,
+    height: 140,
+    chartPadding: 32,
     barHeight: 16,
     tickHeight: 32,
-    padding: "p-5",
-    chartPadding: 100,
-    titleSize: "text-base"
-  },
-}
-
-const formatNumber = (value: number) => {
-  if (value >= 1000000) {
-    const millions = value / 1000000
-    return (millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)) + "M"
+    titleSize: "text-lg",
+    labelSize: "text-base",
+    chartHeight: 60
   }
-  if (value >= 1000) {
-    const thousands = value / 1000
-    return (thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)) + "k"
-  }
-  return value.toString()
-}
-
-const generateHistoricalData = (actual: number, projected: number, goal: number) => {
-  const totalPoints = 15
-  const actualPoints = Math.floor(totalPoints * 0.75)
-  
-  // Calculate slope to reach projected value at 100% width
-  const startValue = actual * 0.85 // Start at 85% of actual
-  const projectedIntersection = projected // End at projected value
-  
-  const stepIncrease = (projectedIntersection - startValue) / (totalPoints - 1)
-  
-  // Generate actual data points with minimal variation
-  const actualData = Array.from({ length: actualPoints }, (_, i) => {
-    // Base value with continuous increase towards projected
-    const baseValue = startValue + (stepIncrease * i)
-    
-    // Add very small random variation (±1%)
-    const variation = baseValue * (Math.random() * 0.02 - 0.01)
-    
-    // Ensure we stay below goal and maintain minimum increase
-    const value = Math.min(
-      baseValue + variation,
-      goal - 1
-    )
-    
-    return { value }
-  })
-
-  // Sort to ensure continuous increase
-  actualData.sort((a, b) => a.value - b.value)
-
-  // Ensure the last actual point matches our current actual
-  actualData[actualData.length - 1].value = actual
-
-  return actualData
 }
 
 const ValueDisplay = ({ 
@@ -110,22 +97,25 @@ const ValueDisplay = ({
   color: string
   projectedStatus?: "over" | "under"
   size?: "sm" | "md" | "lg"
-}) => (
-  <div className="flex-1 text-center">
-    <div className={cn(
-      "font-semibold",
-      color,
-      sizeConfig[size].valueSize,
-      projectedStatus === "over" && "text-emerald-500",
-      projectedStatus === "under" && "text-red-500"
-    )}>
-      {formatNumber(value)}
+}) => {
+  const config = sizeConfig[size]
+  
+  return (
+    <div className="flex-1">
+      <div className={cn("font-medium", color, config.labelSize)}>
+        {label}
+        {projectedStatus && (
+          <span className="ml-1">
+            ({projectedStatus === "over" ? "over" : "under"})
+          </span>
+        )}
+      </div>
+      <div className={cn("font-bold", config.titleSize)}>
+        {value.toLocaleString()}
+      </div>
     </div>
-    <div className={cn("text-muted-foreground", sizeConfig[size].labelSize)}>
-      {label}
-    </div>
-  </div>
-)
+  )
+}
 
 const Separator = () => (
   <div className="h-12 w-px bg-border/30 mx-2" />
@@ -135,19 +125,19 @@ const LineSparkline = ({
   actual, 
   projected, 
   goal,
-  historicalData,
+  historicalData = [],
   size = "md",
   title = "Revenue",
   unit = "USD"
 }: Omit<KPISparkProps, "variant">) => {
   const config = sizeConfig[size]
-  const height = config.height - config.chartPadding
+  const height = config.chartHeight
   const width = config.width - 32
   const isProjectedOverGoal = projected > goal
   
-  const allValues = [...historicalData.map(d => d.value), actual, projected, goal]
-  const maxValue = Math.max(...allValues) * 1.1
-  const minValue = Math.min(...allValues) * 0.9
+  const allValues = [...(historicalData || []).map(d => d.value), actual, projected, goal].filter(Boolean)
+  const maxValue = allValues.length ? Math.max(...allValues) * 1.1 : 100
+  const minValue = allValues.length ? Math.min(...allValues) * 0.9 : 0
   
   const getY = (value: number) => {
     return height - ((value - minValue) / (maxValue - minValue)) * height
@@ -158,14 +148,14 @@ const LineSparkline = ({
   const goalY = getY(goal)
 
   // Calculate points for the actual data (75% of width)
-  const actualPoints = historicalData.map((d, i) => {
-    const x = (i / (historicalData.length - 1)) * width // Extend to full width for slope calculation
+  const actualPoints = (historicalData || []).map((d, i) => {
+    const x = (i / ((historicalData || []).length - 1)) * width
     const y = getY(d.value)
     return `${x} ${y}`
-  }).slice(0, Math.floor(historicalData.length * 0.75)) // Only show 75% of points
+  }).slice(0, Math.floor((historicalData || []).length * 0.75))
 
   return (
-    <div className="relative" style={{ height: config.height }}>
+    <div className="relative" style={{ height: "auto" }}>
       <div className={cn("font-medium mb-2 text-muted-foreground", config.titleSize)}>
         {title} ({unit})
       </div>
@@ -214,33 +204,13 @@ const LineSparkline = ({
         )}
       </div>
       <div className="relative" style={{ height }}>
-        <svg width={width} height={height}>
-          {/* Hashed area between projected and goal */}
-          <defs>
-            <pattern 
-              id={isProjectedOverGoal ? "hashPatternGreen" : "hashPatternRed"}
-              width="8" 
-              height="8" 
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(45)"
-            >
-              <line 
-                x1="0" 
-                y1="0" 
-                x2="0" 
-                y2="8" 
-                stroke={isProjectedOverGoal ? "#10b981" : "#ef4444"}
-                strokeWidth="2"
-                strokeOpacity="0.2"
-              />
-            </pattern>
-          </defs>
-          <rect
-            x="0"
-            y={Math.min(projectedY, goalY)}
-            width={width}
-            height={Math.abs(goalY - projectedY)}
-            fill={`url(#${isProjectedOverGoal ? "hashPatternGreen" : "hashPatternRed"})`}
+        <svg width={width} height={height} className="overflow-visible">
+          {/* Actual path */}
+          <path
+            d={`M ${actualPoints.join(" L ")}`}
+            stroke="#3b82f6"
+            strokeWidth="2"
+            fill="none"
           />
 
           {/* Goal line - now solid */}
@@ -263,14 +233,6 @@ const LineSparkline = ({
             strokeWidth="1"
             strokeDasharray="4 4"
           />
-          
-          {/* Actual path */}
-          <path
-            d={`M ${actualPoints.join(" L ")}`}
-            stroke="#3b82f6"
-            strokeWidth="2"
-            fill="none"
-          />
         </svg>
       </div>
     </div>
@@ -284,7 +246,7 @@ const BarSparkline = ({
   size = "md",
   title = "Revenue",
   unit = "USD"
-}: Omit<KPISparkProps, "variant">) => {
+}: Omit<KPISparkProps, "variant" | "historicalData">) => {
   const config = sizeConfig[size]
   const isProjectedOverGoal = projected > goal
   
@@ -438,44 +400,40 @@ const BarSparkline = ({
   )
 }
 
-const KPISpark = ({
-  actual,
-  projected,
-  goal,
-  historicalData = [],
-  variant = "line",
-  size = "md",
-  title,
-  unit,
-}: KPISparkProps) => {
-  const config = sizeConfig[size]
+const generateHistoricalData = (actual: number, projected: number, goal: number) => {
+  const totalPoints = 15
+  const actualPoints = Math.floor(totalPoints * 0.75)
   
-  return (
-    <Card style={{ width: config.width }}>
-      <CardContent className={config.padding}>
-        {variant === "line" ? (
-          <LineSparkline
-            actual={actual}
-            projected={projected}
-            goal={goal}
-            historicalData={historicalData}
-            size={size}
-            title={title}
-            unit={unit}
-          />
-        ) : (
-          <BarSparkline
-            actual={actual}
-            projected={projected}
-            goal={goal}
-            size={size}
-            title={title}
-            unit={unit}
-          />
-        )}
-      </CardContent>
-    </Card>
-  )
+  // Calculate slope to reach projected value at 100% width
+  const startValue = actual * 0.85 // Start at 85% of actual
+  const projectedIntersection = projected // End at projected value
+  
+  const stepIncrease = (projectedIntersection - startValue) / (totalPoints - 1)
+  
+  // Generate actual data points with minimal variation
+  const actualData = Array.from({ length: actualPoints }, (_, i) => {
+    // Base value with continuous increase towards projected
+    const baseValue = startValue + (stepIncrease * i)
+    
+    // Add very small random variation (±1%)
+    const variation = baseValue * (Math.random() * 0.02 - 0.01)
+    
+    // Ensure we stay below goal and maintain minimum increase
+    const value = Math.min(
+      baseValue + variation,
+      goal - 1
+    )
+    
+    return { value }
+  })
+
+  // Sort to ensure continuous increase
+  actualData.sort((a, b) => a.value - b.value)
+
+  // Ensure the last actual point matches our current actual
+  actualData[actualData.length - 1].value = actual
+
+  return actualData
 }
 
 const meta = {
@@ -488,6 +446,58 @@ const meta = {
 
 export default meta
 type Story = StoryObj<typeof KPISpark>
+
+export const Default: Story = {
+  args: {
+    actual: 750000,
+    projected: 1200000,
+    goal: 1000000,
+    historicalData: generateHistoricalData(750000, 1200000, 1000000),
+    variant: "line",
+    title: "Revenue",
+    unit: "USD",
+    size: "md"
+  }
+}
+
+export const Small: Story = {
+  args: {
+    actual: 750000,
+    projected: 1200000,
+    goal: 1000000,
+    historicalData: generateHistoricalData(750000, 1200000, 1000000),
+    variant: "line",
+    title: "Revenue",
+    unit: "USD",
+    size: "sm"
+  }
+}
+
+export const Large: Story = {
+  args: {
+    actual: 750000,
+    projected: 1200000,
+    goal: 1000000,
+    historicalData: generateHistoricalData(750000, 1200000, 1000000),
+    variant: "line",
+    title: "Revenue",
+    unit: "USD",
+    size: "lg"
+  }
+}
+
+export const UnderGoal: Story = {
+  args: {
+    actual: 650000,
+    projected: 900000,
+    goal: 1000000,
+    historicalData: generateHistoricalData(650000, 900000, 1000000),
+    variant: "line",
+    title: "Revenue",
+    unit: "USD",
+    size: "md"
+  }
+}
 
 export const BarSmallUsage: Story = {
   args: {
@@ -587,5 +597,4 @@ export const LineUnderGoal: Story = {
     unit: "USD",
     size: "md"
   }
-
 }

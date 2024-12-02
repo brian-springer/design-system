@@ -3,15 +3,18 @@ import path from "path";
 
 const config: StorybookConfig = {
   stories: [
+    "../stories/pages/**/*.mdx",
+    "../stories/pages/**/*.stories.@(js|jsx|ts|tsx)",
     "../stories/**/*.mdx",
-    "../stories/**/*.stories.@(js|jsx|mjs|ts|tsx)",
+    "../stories/**/*.stories.@(js|jsx|ts|tsx)",
   ],
   addons: [
-    "@storybook/addon-onboarding",
+    "@storybook/addon-links",
     "@storybook/addon-essentials",
-    "@chromatic-com/storybook",
     "@storybook/addon-interactions",
-    "@storybook/addon-themes"
+    "@storybook/addon-themes",
+    "@storybook/addon-a11y",
+    "@storybook/addon-docs",
   ],
   framework: {
     name: "@storybook/nextjs",
@@ -27,10 +30,12 @@ const config: StorybookConfig = {
     return config;
   },
   docs: {
-    autodocs: true,
+    autodocs: "tag",
+    defaultName: "Documentation",
   },
+  staticDirs: ['../public'],
   core: {
-    builder: '@storybook/builder-webpack5',
+    builder: "@storybook/builder-webpack5",
   },
 };
 

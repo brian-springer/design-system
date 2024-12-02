@@ -52,8 +52,16 @@ const generateRadarData = (trend: 'up' | 'down' | 'flat' = 'flat') => {
   })
 }
 
-// Calculate trend from data
-const calculateTrend = (data: any[]) => {
+// Types
+type TrendDirection = "up" | "down" | "unchanged"
+type TrendData = {
+  direction: TrendDirection
+  value: number
+  period: string
+}
+
+// Function to calculate trend
+const calculateTrend = (data: any[]): TrendData => {
   const lastMonth = data[data.length - 1].desktop
   const previousMonth = data[data.length - 2].desktop
   const percentChange = ((lastMonth - previousMonth) / previousMonth) * 100
@@ -65,26 +73,27 @@ const calculateTrend = (data: any[]) => {
   }
 }
 
+// Helper function to get badge variant
+const getBadgeVariant = (value: number): "default" | "destructive" | "outline" | "secondary" => {
+  if (value > 75) return "default"
+  if (value < 50) return "destructive"
+  return "secondary"
+}
+
 // Component for displaying trend badge
-const getTrendBadge = (trend: { direction: "up" | "down" | "unchanged", value: number, period: string }) => {
+const getTrendBadge = (trend: TrendData) => {
   const icon = {
     up: <TrendingUp className="h-3 w-3" />,
     down: <TrendingDown className="h-3 w-3" />,
     unchanged: <Minus className="h-3 w-3" />
   }[trend.direction]
   
-  const variant = {
-    up: "default",
-    down: "destructive",
-    unchanged: "secondary"
-  }[trend.direction]
+  const variant = getBadgeVariant(trend.value)
   
   return (
     <Badge variant={variant} className="ml-2 px-1.5 py-0.5 font-medium">
-      <span className="flex items-center gap-1.5">
-        {icon}
-        {trend.value}% this {trend.period}
-      </span>
+      {icon}
+      <span className="ml-1">{trend.value.toFixed(1)}%</span>
     </Badge>
   )
 }
@@ -93,11 +102,7 @@ interface RadarChartDemoProps {
   data: Array<{ month: string; desktop: number; mobile?: number; tablet?: number }>
   title?: string
   description?: string
-  trend?: {
-    direction: "up" | "down" | "unchanged"
-    value: number
-    period: string
-  }
+  trend?: TrendData
   variant?: "default" | "filled" | "multi" | "withAxis" | "custom"
   showLegend?: boolean
 }
@@ -210,50 +215,65 @@ export default meta
 type Story = StoryObj<typeof RadarChartDemo>
 
 export const Default: Story = {
-  render: () => {
-    const [data] = useState(() => generateRadarData())
-    const trend = calculateTrend(data)
-    return <RadarChartDemo data={data} trend={trend} />
-  },
+  args: {
+    title: "Performance Metrics",
+    description: "Key performance indicators across different areas",
+    data: generateRadarData(),
+    trend: {
+      direction: "up" as const,
+      value: 12.5,
+      period: "vs last period"
+    },
+    variant: "default"
+  }
 }
 
 export const Filled: Story = {
-  render: () => {
-    const [data] = useState(() => generateRadarData())
-    const trend = calculateTrend(data)
-    return <RadarChartDemo data={data} trend={trend} variant="filled" />
-  },
+  args: {
+    ...Default.args,
+    variant: "filled",
+    trend: {
+      direction: "down" as const,
+      value: 8.3,
+      period: "vs last period"
+    }
+  }
 }
 
 export const WithAxis: Story = {
-  render: () => {
-    const [data] = useState(() => generateRadarData())
-    const trend = calculateTrend(data)
-    return <RadarChartDemo data={data} trend={trend} variant="withAxis" />
-  },
+  args: {
+    ...Default.args,
+    variant: "withAxis",
+    trend: {
+      direction: "up" as const,
+      value: 12.5,
+      period: "vs last period"
+    }
+  }
 }
 
 export const MultiDevice: Story = {
-  render: () => {
-    const [data] = useState(() => generateRadarData())
-    const trend = calculateTrend(data)
-    return (
-      <RadarChartDemo 
-        data={data} 
-        trend={trend} 
-        variant="multi" 
-        showLegend={true}
-        title="Multi-Device Usage"
-        description="Usage patterns across different devices"
-      />
-    )
-  },
+  args: {
+    ...Default.args,
+    variant: "multi",
+    showLegend: true,
+    trend: {
+      direction: "down" as const,
+      value: 8.3,
+      period: "vs last period"
+    }
+  }
 }
 
 export const FilledWithLegend: Story = {
-  render: () => {
-    const [data] = useState(() => generateRadarData())
-    const trend = calculateTrend(data)
-    return <RadarChartDemo data={data} trend={trend} variant="filled" showLegend={true} />
-  },
+  args: {
+    ...Default.args,
+    variant: "filled",
+    showLegend: true,
+    trend: {
+      direction: "up" as const,
+      value: 12.5,
+      period: "vs last period"
+    }
+  }
 }
