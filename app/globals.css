@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 204 86% 97%;      /* sky-50 */
+    --foreground: 204 84% 16%;      /* sky-950 */
+    --card: 0 0% 100%;              /* white */
+    --card-foreground: 204 84% 16%; /* sky-950 */
+    --popover: 0 0% 100%;           /* white */
+    --popover-foreground: 204 84% 16%; /* sky-950 */
+    --primary: 204 84% 16%;         /* sky-950 */
+    --primary-foreground: 204 86% 97%; /* sky-50 */
+    --secondary: 204 94% 94%;       /* sky-100 */
+    --secondary-foreground: 204 84% 16%; /* sky-950 */
+    --muted: 204 94% 94%;           /* sky-100 */
+    --muted-foreground: 204 70% 24%; /* sky-900 */
+    --accent: 204 94% 94%;          /* sky-100 */
+    --accent-foreground: 204 84% 16%; /* sky-950 */
+    --destructive: 0 84% 60%;       /* red-500 */
+    --destructive-foreground: 204 86% 97%; /* sky-50 */
+    --border: 204 94% 86%;          /* sky-200 */
+    --input: 204 94% 86%;           /* sky-200 */
+    --ring: 204 89% 48%;            /* sky-500 */
+    --radius: 0.5rem;
+    /* Chart colors */
+    --chart-1: 204 89% 48%;    /* sky-500 */
+    --chart-2: 204 54% 27%;    /* sky-800 */
+    --chart-3: 204 84% 16%;    /* sky-950 */
+    --chart-4: 204 70% 24%;    /* sky-900 */
+    --chart-5: 204 59% 31%;    /* sky-700 */
+  }
+
+  .dark {
+    --background: 204 84% 16%;      /* sky-950 */
+    --foreground: 204 86% 97%;      /* sky-50 */
+    --card: 204 84% 16%;           /* sky-950 */
+    --card-foreground: 204 86% 97%; /* sky-50 */
+    --popover: 204 84% 16%;        /* sky-950 */
+    --popover-foreground: 204 86% 97%; /* sky-50 */
+    --primary: 204 84% 16%;        /* sky-950 */
+    --primary-foreground: 204 86% 97%; /* sky-50 */
+    --secondary: 204 54% 27%;      /* sky-800 */
+    --secondary-foreground: 204 86% 97%; /* sky-50 */
+    --muted: 204 54% 27%;          /* sky-800 */
+    --muted-foreground: 204 94% 86%; /* sky-200 */
+    --accent: 204 54% 27%;         /* sky-800 */
+    --accent-foreground: 204 86% 97%; /* sky-50 */
+    --destructive: 0 74% 42%;      /* red-700 */
+    --destructive-foreground: 204 86% 97%; /* sky-50 */
+    --border: 204 54% 27%;         /* sky-800 */
+    --input: 204 54% 27%;          /* sky-800 */
+    --ring: 204 89% 48%;           /* sky-500 */
+    /* Chart colors */
+    --chart-1: 204 94% 94%;    /* sky-100 */
+    --chart-2: 204 89% 86%;    /* sky-200 */
+    --chart-3: 204 89% 48%;    /* sky-500 */
+    --chart-4: 204 78% 40%;    /* sky-600 */
+    --chart-5: 204 59% 31%;    /* sky-700 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

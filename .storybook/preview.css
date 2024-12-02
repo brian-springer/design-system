@@ -1,0 +1,18 @@
+/* Theme handling */
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Reset Storybook padding */
+.sb-show-main {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.sb-main-padded {
+  padding: 0 !important;
+}
