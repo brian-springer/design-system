@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "storybook-static",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": null,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build"
+    }
+  ]
+}

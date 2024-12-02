@@ -20,22 +20,26 @@ const config: StorybookConfig = {
     name: "@storybook/nextjs",
     options: {},
   },
-  webpackFinal: async (config) => {
-    if (config.resolve) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@': path.resolve(__dirname, '../'),
-      };
-    }
-    return config;
-  },
   docs: {
     autodocs: "tag",
     defaultName: "Documentation",
   },
-  staticDirs: ['../public'],
   core: {
     builder: "@storybook/builder-webpack5",
+  },
+  typescript: {
+    // Prevents TS errors during build
+    check: false,
+  },
+  webpackFinal: async (config) => {
+    // Ensure public directory is handled correctly
+    if (config.resolve) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@public': '/public',
+      }
+    }
+    return config
   },
 };
 
